@@ -113,20 +113,50 @@ export function KdsProvider({ children }) {
   const updateItemStatus = useCallback(async (itemId, newStatus) => {
     soundEngine.playTap();
     await supabase.from('order_items').update({ status: newStatus }).eq('id', itemId);
-    setKitchenItems(prev => prev.map(i => (i.id === itemId ? { ...i, status: newStatus } : i)));
+    
+    setKitchenItems(prev => {
+      const next = prev.map(i => (i.id === itemId ? { ...i, status: newStatus } : i));
+      
+      // If marking ready, check if all kitchen items for that KOT are now ready
+      const target = prev.find(i => i.id === itemId);
+      if (target?.kot_id) {
+        const kotItems = next.filter(i => i.kot_id === target.kot_id && !i.is_cancelled);
+        const allReady = kotItems.length > 0 && kotItems.every(i => i.status === 'READY');
+        if (allReady) {
+          supabase.from('kots').update({ status: 'READY' }).eq('id', target.kot_id).then();
+          setKots(kPrev => kPrev.map(k => k.id === target.kot_id ? { ...k, status: 'READY' } : k));
+        } else if (newStatus !== 'READY') {
+          supabase.from('kots').update({ status: 'PREPARING' }).eq('id', target.kot_id).then();
+          setKots(kPrev => kPrev.map(k => k.id === target.kot_id ? { ...k, status: 'PREPARING' } : k));
+        }
+      }
+      return next;
+    });
   }, []);
 
   // Bump whole ticket to READY
   const bumpTicket = useCallback(async (kotId) => {
     soundEngine.playTap();
+    
+    // 1. Mark all kitchen order items READY
     await supabase
       .from('order_items')
       .update({ status: 'READY' })
       .eq('kot_id', kotId)
       .eq('department', 'KITCHEN');
 
+    // 2. Mark KOT row as READY
+    await supabase
+      .from('kots')
+      .update({ status: 'READY' })
+      .eq('id', kotId);
+
+    // 3. Update local states
     setKitchenItems(prev =>
       prev.map(i => (i.kot_id === kotId ? { ...i, status: 'READY' } : i))
+    );
+    setKots(prev =>
+      prev.map(k => (k.id === kotId ? { ...k, status: 'READY' } : k))
     );
   }, []);
 

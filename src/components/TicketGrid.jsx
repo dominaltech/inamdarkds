@@ -77,6 +77,8 @@ export default function TicketGrid() {
           isDelayed
         };
       })
+      // Food cart is removed from screen when food is ready
+      .filter(ticket => !ticket.isAllReady && ticket.status !== 'READY')
       .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
   }, [kots, kitchenItems, now]);
 
