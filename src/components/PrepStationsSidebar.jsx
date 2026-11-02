@@ -10,15 +10,18 @@ import {
 } from 'lucide-react';
 
 export default function PrepStationsSidebar({ isOpen, onClose }) {
-  const { kitchenItems, updateItemStatus } = useKds();
+  const { kots, kitchenItems, updateItemStatus } = useKds();
   const [collapsedCategories, setCollapsedCategories] = useState({});
 
   // Group active kitchen items by category for the PREP STATIONS sidebar
   const stationCategories = useMemo(() => {
     const map = new Map();
 
+    // Active tickets only (not bumped/completed)
+    const activeKotIds = new Set(kots.filter(k => k.status !== 'READY').map(k => k.id));
+
     kitchenItems
-      .filter(item => !item.is_cancelled && item.status !== 'SERVED')
+      .filter(item => !item.is_cancelled && (activeKotIds.has(item.kot_id) || !item.kot_id))
       .forEach(item => {
         const cat = item.category || 'General Kitchen';
         if (!map.has(cat)) {
@@ -53,7 +56,7 @@ export default function PrepStationsSidebar({ isOpen, onClose }) {
       totalCount: Array.from(cat.items.values()).reduce((sum, d) => sum + d.totalQty, 0),
       isAllReady: Array.from(cat.items.values()).every(d => d.readyQty === d.totalQty && d.totalQty > 0)
     }));
-  }, [kitchenItems]);
+  }, [kitchenItems, kots]);
 
   const toggleCategoryCollapse = (catName) => {
     setCollapsedCategories(prev => ({

@@ -37,7 +37,7 @@ export default function TicketGrid() {
     });
 
     kitchenItems
-      .filter(item => !item.is_cancelled && item.status !== 'SERVED')
+      .filter(item => !item.is_cancelled)
       .forEach(item => {
         if (kotMap.has(item.kot_id)) {
           kotMap.get(item.kot_id).items.push(item);
@@ -77,8 +77,8 @@ export default function TicketGrid() {
           isDelayed
         };
       })
-      // Food cart is removed from screen when food is ready
-      .filter(ticket => !ticket.isAllReady && ticket.status !== 'READY')
+      // Food ticket only disappears from screen when cook clicks the "Food Ready" button (ticket.status === 'READY')
+      .filter(ticket => ticket.status !== 'READY')
       .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
   }, [kots, kitchenItems, now]);
 
