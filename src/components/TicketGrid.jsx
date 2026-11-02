@@ -30,7 +30,7 @@ export default function TicketGrid() {
     const kotMap = new Map();
 
     kots.forEach(kot => {
-      kotMap.set(kot.id, {
+      kotMap.set(String(kot.id), {
         ...kot,
         items: []
       });
@@ -39,16 +39,18 @@ export default function TicketGrid() {
     kitchenItems
       .filter(item => !item.is_cancelled)
       .forEach(item => {
-        if (kotMap.has(item.kot_id)) {
-          kotMap.get(item.kot_id).items.push(item);
+        const key = String(item.kot_id);
+        if (kotMap.has(key)) {
+          kotMap.get(key).items.push(item);
         } else {
-          kotMap.set(item.kot_id, {
+          kotMap.set(key, {
             id: item.kot_id,
             kot_number: item.kot_number,
             table_id: item.table_id,
             section: 'AC',
             waiter_name: '1 COUNTER',
             created_at: item.created_at,
+            status: 'PENDING',
             items: [item]
           });
         }

@@ -111,16 +111,18 @@ export function KdsProvider({ children }) {
 
   // Cook toggles item status (individual item readiness)
   const updateItemStatus = useCallback(async (itemId, newStatus) => {
+    if (!itemId) return;
     soundEngine.playTap();
     await supabase.from('order_items').update({ status: newStatus }).eq('id', itemId);
     
     setKitchenItems(prev => {
-      return prev.map(i => (i.id === itemId ? { ...i, status: newStatus } : i));
+      return prev.map(i => (String(i.id) === String(itemId) ? { ...i, status: newStatus } : i));
     });
   }, []);
 
-  // Bump whole ticket to READY
+  // Bump whole ticket to READY (removes ticket and its food items from cooking queue)
   const bumpTicket = useCallback(async (kotId) => {
+    if (!kotId) return;
     soundEngine.playTap();
     
     // 1. Mark all kitchen order items READY
@@ -136,12 +138,12 @@ export function KdsProvider({ children }) {
       .update({ status: 'READY' })
       .eq('id', kotId);
 
-    // 3. Update local states
+    // 3. Update local states with type-safe string comparison
     setKitchenItems(prev =>
-      prev.map(i => (i.kot_id === kotId ? { ...i, status: 'READY' } : i))
+      prev.map(i => (String(i.kot_id) === String(kotId) ? { ...i, status: 'READY' } : i))
     );
     setKots(prev =>
-      prev.map(k => (k.id === kotId ? { ...k, status: 'READY' } : k))
+      prev.map(k => (String(k.id) === String(kotId) ? { ...k, status: 'READY' } : k))
     );
   }, []);
 
