@@ -126,7 +126,7 @@ html, body {
   transform: translateX(16px);
 }
 
-/* Ticket Receipt Card - Natural Height Adjusting to Items */
+/* Ticket Receipt Card - Natural Height Adjusting to Items with Aligned Rows */
 .kds-ticket-card {
   background: var(--kds-card-bg);
   border-radius: 10px;
@@ -134,11 +134,12 @@ html, body {
   border: 1px solid var(--kds-card-border);
   display: flex;
   flex-direction: column;
+  justifyContent: space-between;
   overflow: hidden;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   min-width: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
 }
 .kds-ticket-card:hover {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);

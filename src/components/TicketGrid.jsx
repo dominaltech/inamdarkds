@@ -344,7 +344,7 @@ export default function TicketGrid() {
         </button>
       </div>
 
-      {/* Main KOT Table Order Cards Grid (Height Adjusts to Items, No Overlap, No Internal Scroll) */}
+      {/* Main KOT Table Order Cards Grid (Uniform Row Alignment, Zero Overlap, No Internal Scroll) */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
@@ -352,8 +352,9 @@ export default function TicketGrid() {
         padding: '14px',
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-        alignItems: 'start',
-        gap: '12px',
+        gridAutoRows: 'max-content',
+        alignItems: 'stretch',
+        gap: '14px',
         width: '100%',
         boxSizing: 'border-box'
       }}>
@@ -384,9 +385,10 @@ export default function TicketGrid() {
                 key={ticket.id}
                 className={`kds-ticket-card ${ticket.isDelayed ? 'delayed' : ''}`}
                 style={{
-                  height: 'auto',
+                  height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
+                  justifyContent: 'space-between',
                   boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
                   boxSizing: 'border-box',
                   width: '100%',
@@ -495,13 +497,14 @@ export default function TicketGrid() {
                 {/* Dashed Perforated Line */}
                 <div className="receipt-perforation" style={{ flexShrink: 0 }} />
 
-                {/* Items List inside Receipt (Natural Height, No Internal Scroll) */}
+                {/* Items List inside Receipt (Flex 1, Natural Height, No Internal Scroll) */}
                 <div style={{
                   padding: '8px 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  flex: 1
                 }}>
                   {ticket.items.map(item => {
                     const isReady = item.status === 'READY';
@@ -564,7 +567,7 @@ export default function TicketGrid() {
                   })}
                 </div>
 
-                {/* Bottom Food Ready Button (Aligned perfectly along the bottom baseline across all cards) */}
+                {/* Bottom Food Ready Button (Always pinned cleanly at card bottom, never overlapped) */}
                 <button
                   onClick={() => handleFoodReadyClick(ticket)}
                   style={{
@@ -583,7 +586,8 @@ export default function TicketGrid() {
                     cursor: 'pointer',
                     transition: 'background-color 0.15s ease',
                     letterSpacing: '0.3px',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    marginTop: 'auto'
                   }}
                 >
                   {ticket.isAllReady ? (
