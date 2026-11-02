@@ -344,16 +344,16 @@ export default function TicketGrid() {
         </button>
       </div>
 
-      {/* Main KOT Table Order Cards Grid (Uniform Height, Fully Aligned, Never Cut Off) */}
+      {/* Main KOT Table Order Cards Grid (Height Adjusts to Items, No Overlap, No Internal Scroll) */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
         padding: '14px',
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(215px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        alignItems: 'start',
         gap: '12px',
-        alignContent: 'start',
         width: '100%',
         boxSizing: 'border-box'
       }}>
@@ -384,15 +384,13 @@ export default function TicketGrid() {
                 key={ticket.id}
                 className={`kds-ticket-card ${ticket.isDelayed ? 'delayed' : ''}`}
                 style={{
-                  height: '240px',
-                  minHeight: '240px',
-                  maxHeight: '240px',
+                  height: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-between',
                   boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
                   boxSizing: 'border-box',
-                  width: '100%'
+                  width: '100%',
+                  minWidth: 0
                 }}
               >
                 {/* Receipt Card Header */}
@@ -497,15 +495,13 @@ export default function TicketGrid() {
                 {/* Dashed Perforated Line */}
                 <div className="receipt-perforation" style={{ flexShrink: 0 }} />
 
-                {/* Items List inside Receipt (Flex 1 scroll area, uniform across all cards) */}
+                {/* Items List inside Receipt (Natural Height, No Internal Scroll) */}
                 <div style={{
-                  padding: '6px 12px',
+                  padding: '8px 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px',
-                  overflowY: 'auto',
-                  flex: 1,
-                  minHeight: 0
+                  boxSizing: 'border-box'
                 }}>
                   {ticket.items.map(item => {
                     const isReady = item.status === 'READY';
