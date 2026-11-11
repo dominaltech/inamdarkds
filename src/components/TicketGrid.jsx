@@ -61,8 +61,16 @@ export default function TicketGrid() {
     return Array.from(kotMap.values())
       .filter(t => t.items && t.items.length > 0)
       .map(ticket => {
-        const pendingOrPrep = ticket.items.filter(i => i.status === 'PENDING' || i.status === 'PREPARING');
-        const isAllReady = pendingOrPrep.length === 0 && ticket.items.length > 0;
+        // Sort dishes by culinary course category_order, then item code
+        const sortedItems = [...ticket.items].sort((a, b) => {
+          const ordA = a.category_order ?? a.categoryOrder ?? 99;
+          const ordB = b.category_order ?? b.categoryOrder ?? 99;
+          if (ordA !== ordB) return ordA - ordB;
+          return (Number(a.item_code || a.code) || 0) - (Number(b.item_code || b.code) || 0);
+        });
+
+        const pendingOrPrep = sortedItems.filter(i => i.status === 'PENDING' || i.status === 'PREPARING');
+        const isAllReady = pendingOrPrep.length === 0 && sortedItems.length > 0;
         
         const section = (ticket.section || 'GENERAL').toUpperCase();
 
@@ -73,6 +81,7 @@ export default function TicketGrid() {
 
         return {
           ...ticket,
+          items: sortedItems,
           section,
           isAllReady,
           pendingCount: pendingOrPrep.length,
