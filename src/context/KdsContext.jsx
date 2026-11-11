@@ -49,13 +49,13 @@ export function KdsProvider({ children }) {
     }
   }, []);
 
-  // Real-time Subscriptions
+  // Real-time Subscriptions (Single consolidated channel for minimal egress)
   useEffect(() => {
     loadData();
 
-    // 1. KOTs channel (incoming orders)
-    const kotsChannel = supabase
-      .channel('kds_kots_live')
+    const kdsLiveHub = supabase
+      .channel('kds_live_hub')
+      // 1. KOTs events (incoming orders)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kots' }, payload => {
         const newKot = payload.new;
         setKots(prev => [...prev.filter(k => String(k.id) !== String(newKot.id)), newKot]);
@@ -71,11 +71,7 @@ export function KdsProvider({ children }) {
           setKots(prev => prev.filter(k => String(k.id) !== String(delId)));
         }
       })
-      .subscribe();
-
-    // 2. Kitchen line items channel
-    const itemsChannel = supabase
-      .channel('kds_items_live')
+      // 2. Kitchen line items events
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_items' }, payload => {
         const item = payload.new;
         // Only accept kitchen items that are active and not served
@@ -129,8 +125,7 @@ export function KdsProvider({ children }) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(kotsChannel);
-      supabase.removeChannel(itemsChannel);
+      supabase.removeChannel(kdsLiveHub);
     };
   }, [loadData]);
 
