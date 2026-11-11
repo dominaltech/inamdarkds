@@ -3,7 +3,6 @@ import { useKds } from '../context/KdsContext';
 import { soundEngine } from '../services/soundEngine';
 import {
   LayoutGrid,
-  Snowflake,
   Users,
   ShoppingBag,
   Truck,
@@ -11,12 +10,13 @@ import {
   ChefHat,
   User,
   AlertTriangle,
-  Check
+  Check,
+  Utensils
 } from 'lucide-react';
 
 export default function TicketGrid() {
   const { kots, kitchenItems, updateItemStatus, bumpTicket } = useKds();
-  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'AC' | 'FAMILY AC' | 'PARCEL' | 'HOME DELIVERY' | 'DELAYED'
+  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'GENERAL' | 'FAMILY AC' | 'PARCEL' | 'HOME DELIVERY' | 'DELAYED'
   const [now, setNow] = useState(Date.now());
 
   // Real-time ticking timer for elapsed times
@@ -37,18 +37,20 @@ export default function TicketGrid() {
     });
 
     kitchenItems
-      .filter(item => !item.is_cancelled)
+      .filter(item => !item.is_cancelled && item.status !== 'SERVED')
       .forEach(item => {
         const key = String(item.kot_id);
         if (kotMap.has(key)) {
           kotMap.get(key).items.push(item);
-        } else {
+        } else if (item.kot_id) {
           kotMap.set(key, {
             id: item.kot_id,
             kot_number: item.kot_number,
             table_id: item.table_id,
-            section: 'AC',
+            section: 'GENERAL',
             waiter_name: '1 COUNTER',
+            customer_name: '',
+            customer_phone: '',
             created_at: item.created_at,
             status: 'PENDING',
             items: [item]
@@ -62,7 +64,7 @@ export default function TicketGrid() {
         const pendingOrPrep = ticket.items.filter(i => i.status === 'PENDING' || i.status === 'PREPARING');
         const isAllReady = pendingOrPrep.length === 0 && ticket.items.length > 0;
         
-        const section = (ticket.section || 'AC').toUpperCase();
+        const section = (ticket.section || 'GENERAL').toUpperCase();
 
         const createdAtMs = new Date(ticket.created_at || Date.now()).getTime();
         const elapsedSecs = Math.max(0, Math.floor((now - createdAtMs) / 1000));
@@ -79,14 +81,14 @@ export default function TicketGrid() {
           isDelayed
         };
       })
-      // Food ticket only disappears from screen when cook clicks the "Food Ready" button (ticket.status === 'READY')
-      .filter(ticket => ticket.status !== 'READY')
+      // Food ticket only disappears from screen when cook clicks the "Food Ready" button (ticket.status === 'READY') or already served
+      .filter(ticket => ticket.status !== 'READY' && ticket.status !== 'CANCELLED' && ticket.status !== 'SERVED' && !ticket.items.every(i => i.status === 'SERVED'))
       .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
   }, [kots, kitchenItems, now]);
 
-  // Filter counts matching Captain App sections
+  // Filter counts matching database sections
   const allCount = tickets.length;
-  const acCount = tickets.filter(t => t.section === 'AC').length;
+  const generalCount = tickets.filter(t => t.section === 'GENERAL' || t.section === 'AC').length;
   const familyAcCount = tickets.filter(t => t.section === 'FAMILY AC').length;
   const parcelCount = tickets.filter(t => t.section === 'PARCEL').length;
   const deliveryCount = tickets.filter(t => t.section === 'HOME DELIVERY').length;
@@ -94,8 +96,9 @@ export default function TicketGrid() {
 
   const filteredTickets = useMemo(() => {
     switch (activeFilter) {
+      case 'GENERAL':
       case 'AC':
-        return tickets.filter(t => t.section === 'AC');
+        return tickets.filter(t => t.section === 'GENERAL' || t.section === 'AC');
       case 'FAMILY AC':
         return tickets.filter(t => t.section === 'FAMILY AC');
       case 'PARCEL':
@@ -174,18 +177,18 @@ export default function TicketGrid() {
           </span>
         </button>
 
-        {/* AC Tab */}
+        {/* General Tab (Tables 1-20 & legacy AC) */}
         <button
-          onClick={() => setActiveFilter('AC')}
+          onClick={() => setActiveFilter('GENERAL')}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
             padding: '6px 14px',
             borderRadius: '999px',
-            border: activeFilter === 'AC' ? 'none' : '1px solid #e2e8f0',
-            background: activeFilter === 'AC' ? 'var(--kds-blue)' : '#f8fafc',
-            color: activeFilter === 'AC' ? '#ffffff' : '#475569',
+            border: (activeFilter === 'GENERAL' || activeFilter === 'AC') ? 'none' : '1px solid #e2e8f0',
+            background: (activeFilter === 'GENERAL' || activeFilter === 'AC') ? 'var(--kds-blue)' : '#f8fafc',
+            color: (activeFilter === 'GENERAL' || activeFilter === 'AC') ? '#ffffff' : '#475569',
             fontWeight: '800',
             fontSize: '12px',
             cursor: 'pointer',
@@ -193,17 +196,17 @@ export default function TicketGrid() {
             whiteSpace: 'nowrap'
           }}
         >
-          <Snowflake size={14} />
-          <span>AC</span>
-          {acCount > 0 && (
+          <Utensils size={14} />
+          <span>General</span>
+          {generalCount > 0 && (
             <span style={{
               fontSize: '11px',
               padding: '1px 6px',
               borderRadius: '999px',
-              background: activeFilter === 'AC' ? 'rgba(255, 255, 255, 0.25)' : '#e2e8f0',
-              color: activeFilter === 'AC' ? '#ffffff' : '#334155'
+              background: (activeFilter === 'GENERAL' || activeFilter === 'AC') ? 'rgba(255, 255, 255, 0.25)' : '#e2e8f0',
+              color: (activeFilter === 'GENERAL' || activeFilter === 'AC') ? '#ffffff' : '#334155'
             }}>
-              {acCount}
+              {generalCount}
             </span>
           )}
         </button>
@@ -418,22 +421,30 @@ export default function TicketGrid() {
                       gap: '3px',
                       fontSize: '10.5px',
                       fontWeight: '800',
-                      color: ticket.section === 'PARCEL' ? '#ea580c' : ticket.section === 'HOME DELIVERY' ? '#3b82f6' : '#15803d',
+                      color: (ticket.section === 'PARCEL' || (ticket.table_id && String(ticket.table_id).startsWith('0') && !String(ticket.table_id).startsWith('00')))
+                        ? '#ea580c'
+                        : (ticket.section === 'HOME DELIVERY' || (ticket.table_id && String(ticket.table_id).startsWith('00')))
+                        ? '#3b82f6'
+                        : ticket.section === 'FAMILY AC'
+                        ? '#8b5cf6'
+                        : '#15803d',
                       textTransform: 'uppercase',
                       letterSpacing: '0.3px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
-                      maxWidth: '85px'
+                      maxWidth: '95px'
                     }}>
-                      {ticket.section === 'PARCEL' ? (
+                      {ticket.section === 'PARCEL' || (ticket.table_id && String(ticket.table_id).startsWith('0') && !String(ticket.table_id).startsWith('00')) ? (
                         <ShoppingBag size={11} />
-                      ) : ticket.section === 'HOME DELIVERY' ? (
+                      ) : ticket.section === 'HOME DELIVERY' || (ticket.table_id && String(ticket.table_id).startsWith('00')) ? (
                         <Truck size={11} />
+                      ) : ticket.section === 'FAMILY AC' ? (
+                        <Users size={11} />
                       ) : (
-                        <Snowflake size={11} />
+                        <Utensils size={11} />
                       )}
-                      <span>{ticket.section}</span>
+                      <span>{ticket.section === 'AC' ? 'GENERAL' : (ticket.section || 'GENERAL')}</span>
                     </div>
 
                     {/* Center: Large KOT # */}
@@ -479,7 +490,19 @@ export default function TicketGrid() {
                       color: '#1e293b'
                     }}>
                       <span style={{ color: '#64748b', fontSize: '11px' }}>🍽</span>
-                      <span>{ticket.table_id ? `A${ticket.table_id}` : 'Parcel'}</span>
+                      <span>
+                        {(() => {
+                          const tblStr = ticket.table_id !== undefined && ticket.table_id !== null ? String(ticket.table_id).trim() : '';
+                          const secStr = (ticket.section || '').toUpperCase();
+                          if (secStr === 'PARCEL' || tblStr === '0' || tblStr.startsWith('0-') || tblStr.startsWith('0B') || tblStr.startsWith('0C') || tblStr.startsWith('0D') || tblStr.startsWith('0E')) {
+                            return tblStr && tblStr !== '0' ? `Parcel ${tblStr}` : 'Parcel';
+                          }
+                          if (secStr === 'HOME DELIVERY' || tblStr.startsWith('00')) {
+                            return `Delivery (${tblStr || 'Guest'})`;
+                          }
+                          return `Table ${tblStr}`;
+                        })()}
+                      </span>
                     </div>
 
                     <div style={{
@@ -491,9 +514,37 @@ export default function TicketGrid() {
                       fontWeight: '600'
                     }}>
                       <User size={11} />
-                      <span>{ticket.waiter_name || '1 COUNTER'}</span>
+                      <span>{ticket.waiter_name ? ticket.waiter_name.split(' • ')[0] : '1 COUNTER'}</span>
                     </div>
                   </div>
+
+                  {/* Row 3: Customer Details if present */}
+                  {(() => {
+                    const custInfoPart = (ticket.waiter_name && ticket.waiter_name.includes(' • ')) ? (ticket.waiter_name.split(' • ')[1] || '') : '';
+                    const custName = (ticket.customer_name || (custInfoPart ? custInfoPart.split(' (')[0] : '') || '').trim();
+                    const custPhone = (ticket.customer_phone || (custInfoPart ? custInfoPart.match(/\((.*?)\)/)?.[1] : '') || '').trim();
+                    if (!custName && !custPhone) return null;
+                    return (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '11px',
+                        color: '#334155',
+                        fontWeight: '700',
+                        marginTop: '4px',
+                        paddingTop: '3px',
+                        borderTop: '1px dashed #e2e8f0',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        <span style={{ color: '#059669', fontSize: '11px' }}>👤</span>
+                        <span style={{ color: '#0f172a', fontWeight: '800' }}>{custName}</span>
+                        {custPhone && <span style={{ color: '#64748b', fontSize: '10px' }}>({custPhone})</span>}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Dashed Perforated Line */}
@@ -558,9 +609,17 @@ export default function TicketGrid() {
 
                         {/* Interactive Toggle Switch */}
                         <div
-                          onClick={() => handleToggleItemReady(item)}
+                          onClick={() => {
+                            if (item.status !== 'SERVED') {
+                              handleToggleItemReady(item);
+                            }
+                          }}
                           className={`toggle-switch ${isReady ? 'active' : ''}`}
-                          title={isReady ? 'Mark pending' : 'Mark item ready'}
+                          style={{
+                            opacity: item.status === 'SERVED' ? 0.5 : 1,
+                            cursor: item.status === 'SERVED' ? 'default' : 'pointer'
+                          }}
+                          title={item.status === 'SERVED' ? 'Item already served' : isReady ? 'Mark pending' : 'Mark item ready'}
                         >
                           <div className="toggle-thumb" />
                         </div>

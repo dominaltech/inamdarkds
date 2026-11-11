@@ -23,7 +23,7 @@ export function KdsProvider({ children }) {
     try {
       setIsLoading(true);
 
-      // 1. Fetch active KOTs
+      // 1. Fetch active KOTs (PENDING, PREPARING, READY)
       const { data: kData } = await supabase
         .from('kots')
         .select('*')
@@ -32,13 +32,13 @@ export function KdsProvider({ children }) {
 
       if (kData) setKots(kData);
 
-      // 2. Fetch active Kitchen items only (department = 'KITCHEN')
+      // 2. Fetch active Kitchen items only (department = 'KITCHEN', not cancelled, unserved)
       const { data: oData } = await supabase
         .from('order_items')
         .select('*')
         .eq('department', 'KITCHEN')
         .eq('is_cancelled', false)
-        .in('status', ['PENDING', 'PREPARING', 'READY', 'SERVED'])
+        .in('status', ['PENDING', 'PREPARING', 'READY'])
         .order('created_at', { ascending: true });
 
       if (oData) setKitchenItems(oData);
@@ -58,12 +58,18 @@ export function KdsProvider({ children }) {
       .channel('kds_kots_live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kots' }, payload => {
         const newKot = payload.new;
-        setKots(prev => [...prev.filter(k => k.id !== newKot.id), newKot]);
+        setKots(prev => [...prev.filter(k => String(k.id) !== String(newKot.id)), newKot]);
         // Ring kitchen bell
         soundEngine.playKitchenBell();
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'kots' }, payload => {
-        setKots(prev => prev.map(k => (k.id === payload.new.id ? payload.new : k)));
+        setKots(prev => prev.map(k => (String(k.id) === String(payload.new.id) ? payload.new : k)));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'kots' }, payload => {
+        const delId = payload.old?.id;
+        if (delId) {
+          setKots(prev => prev.filter(k => String(k.id) !== String(delId)));
+        }
       })
       .subscribe();
 
@@ -72,9 +78,9 @@ export function KdsProvider({ children }) {
       .channel('kds_items_live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_items' }, payload => {
         const item = payload.new;
-        // Only accept kitchen items
-        if (item.department === 'KITCHEN' && !item.is_cancelled) {
-          setKitchenItems(prev => [...prev.filter(i => i.id !== item.id), item]);
+        // Only accept kitchen items that are active and not served
+        if (item.department === 'KITCHEN' && !item.is_cancelled && item.status !== 'SERVED') {
+          setKitchenItems(prev => [...prev.filter(i => String(i.id) !== String(item.id)), item]);
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'order_items' }, payload => {
@@ -92,13 +98,32 @@ export function KdsProvider({ children }) {
             time: new Date().toLocaleTimeString(),
           });
           // Remove from cook queue
-          setKitchenItems(prev => prev.filter(i => i.id !== updated.id));
+          setKitchenItems(prev => prev.filter(i => String(i.id) !== String(updated.id)));
           return;
         }
 
-        // Update item status
+        // If an item was picked up / served by waiter, remove from kitchen queue
+        if (updated.status === 'SERVED') {
+          setKitchenItems(prev => prev.filter(i => String(i.id) !== String(updated.id)));
+          return;
+        }
+
+        // Update item status in cook queue
         if (updated.department === 'KITCHEN') {
-          setKitchenItems(prev => prev.map(i => (i.id === updated.id ? updated : i)));
+          setKitchenItems(prev => {
+            const exists = prev.some(i => String(i.id) === String(updated.id));
+            if (exists) {
+              return prev.map(i => (String(i.id) === String(updated.id) ? updated : i));
+            } else {
+              return [...prev, updated];
+            }
+          });
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'order_items' }, payload => {
+        const delId = payload.old?.id;
+        if (delId) {
+          setKitchenItems(prev => prev.filter(i => String(i.id) !== String(delId)));
         }
       })
       .subscribe();
@@ -125,12 +150,13 @@ export function KdsProvider({ children }) {
     if (!kotId) return;
     soundEngine.playTap();
     
-    // 1. Mark all kitchen order items READY
+    // 1. Mark all unserved kitchen order items READY
     await supabase
       .from('order_items')
       .update({ status: 'READY' })
       .eq('kot_id', kotId)
-      .eq('department', 'KITCHEN');
+      .eq('department', 'KITCHEN')
+      .neq('status', 'SERVED');
 
     // 2. Mark KOT row as READY
     await supabase
@@ -140,7 +166,7 @@ export function KdsProvider({ children }) {
 
     // 3. Update local states with type-safe string comparison
     setKitchenItems(prev =>
-      prev.map(i => (String(i.kot_id) === String(kotId) ? { ...i, status: 'READY' } : i))
+      prev.map(i => (String(i.kot_id) === String(kotId) && i.status !== 'SERVED' ? { ...i, status: 'READY' } : i))
     );
     setKots(prev =>
       prev.map(k => (String(k.id) === String(kotId) ? { ...k, status: 'READY' } : k))

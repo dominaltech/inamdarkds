@@ -3,12 +3,9 @@ import { useKds } from '../context/KdsContext';
 import { soundEngine } from '../services/soundEngine';
 import {
   Flame,
-  CheckCircle2,
-  Clock,
   AlertTriangle,
   Utensils,
   Layers,
-  ChevronRight,
   CheckCheck
 } from 'lucide-react';
 
@@ -336,7 +333,11 @@ export default function ItemSummaryView({ selectedStation }) {
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ fontSize: '15px', fontWeight: '900', color: '#fff' }}>
-                                Table {order.tableId}
+                                {order.tableId?.startsWith('00')
+                                  ? `Delivery (${order.tableId})`
+                                  : order.tableId === '0' || order.tableId?.startsWith('0')
+                                  ? `Parcel ${order.tableId}`
+                                  : `Table ${order.tableId}`}
                               </span>
                               <span style={{
                                 padding: '2px 8px',

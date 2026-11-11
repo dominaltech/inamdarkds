@@ -18,10 +18,14 @@ export default function PrepStationsSidebar({ isOpen, onClose }) {
     const map = new Map();
 
     // Active tickets only (not bumped/completed)
-    const activeKotIds = new Set(kots.filter(k => k.status !== 'READY').map(k => k.id));
+    const activeKotIds = new Set(
+      kots
+        .filter(k => k.status !== 'READY' && k.status !== 'CANCELLED' && k.status !== 'SERVED')
+        .map(k => String(k.id))
+    );
 
     kitchenItems
-      .filter(item => !item.is_cancelled && (activeKotIds.has(item.kot_id) || !item.kot_id))
+      .filter(item => !item.is_cancelled && item.status !== 'SERVED' && (activeKotIds.has(String(item.kot_id)) || !item.kot_id))
       .forEach(item => {
         const cat = item.category || 'General Kitchen';
         if (!map.has(cat)) {
@@ -69,7 +73,9 @@ export default function PrepStationsSidebar({ isOpen, onClose }) {
     soundEngine.playTap();
     const shouldMarkReady = dish.readyQty < dish.totalQty;
     for (const lineItem of dish.lineItems) {
-      await updateItemStatus(lineItem.id, shouldMarkReady ? 'READY' : 'PREPARING');
+      if (lineItem.status !== 'SERVED') {
+        await updateItemStatus(lineItem.id, shouldMarkReady ? 'READY' : 'PREPARING');
+      }
     }
   };
 
